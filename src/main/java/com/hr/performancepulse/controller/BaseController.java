@@ -4,6 +4,8 @@ import com.hr.performancepulse.dto.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.UUID;
+
 /**
  * Base class for all REST controllers.
  *
@@ -39,5 +41,20 @@ public abstract class BaseController {
      */
     protected ResponseEntity<Void> noContent() {
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Parse a string UUID from a path variable.
+     * 
+     * @param id the UUID string
+     * @return the parsed UUID
+     * @throws IllegalArgumentException if the string is not a valid UUID
+     */
+    protected UUID parseUuid(String id) {
+        try {
+            return UUID.fromString(id);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid UUID format: " + id, e);
+        }
     }
 }

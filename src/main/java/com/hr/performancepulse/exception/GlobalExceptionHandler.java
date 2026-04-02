@@ -61,6 +61,17 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * LLD §10 – 409 when attempting to create an employee with a duplicate email.
+     */
+    @ExceptionHandler(DuplicateEmployeeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateEmployee(DuplicateEmployeeException ex) {
+        log.warn("Duplicate employee attempt: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("DUPLICATE_EMPLOYEE", ex.getMessage()));
+    }
+
+    /**
      * LLD §10 – 422 when a cycle state transition is illegal
      * (e.g. closing an already-closed cycle).
      */
