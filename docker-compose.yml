@@ -1,35 +1,74 @@
 # =============================================================================
-#  Talent Performance Pulse – Docker Compose
-#
-#  Profiles:
-#    dev  (default) – Spring Boot + H2 in-memory, no external DB needed
-#    prod           – Spring Boot + PostgreSQL + pgAdmin
+#  Talent Performance Pulse – Docker Compose (PostgreSQL + Spring Boot)
 #
 #  Usage:
-#    Dev  : docker compose up                          (H2, no Postgres)
-#    Prod : docker compose --profile prod up -d        (Postgres stack)
-#    Build: docker compose build --no-cache
-#    Stop : docker compose down -v                     (-v removes volumes)
+#    docker compose up -d          # Start PostgreSQL and Spring Boot
+#    docker compose down -v        # Stop and remove volumes
+#  
+#  Default: Uses PostgreSQL with automatic database and table creation
+#  Spring Boot will create tables via ddl-auto: create if they don't exist
 # =============================================================================
 
 services:
 
-  # ── Application (always starts) ─────────────────────────────────────────────
+  # ── PostgreSQL Database ────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: performance-pulse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       performance_pulse
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - pulse-net
+
+  # ── pgAdmin (PostgreSQL Management UI) ──────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: performance-pulse-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - pulse-net
+
+  # ── Spring Boot Application ────────────────────────────────────────────────────
   app:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runtime          # use the slim runtime stage, not the builder
+      target: runtime
     container_name: performance-pulse-app
     image: performance-pulse:latest
     ports:
       - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      # Prod DB vars – ignored when profile=dev (H2 is used instead)
-      DB_URL:      ${DB_URL:-jdbc:postgresql://postgres:5432/performancepulse}
-      DB_USER:     ${DB_USER:-pulse_user}
-      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/performance_pulse
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO: create
       # JVM memory – tune per deployment
       JAVA_OPTS: >-
         -XX:+UseContainerSupport
@@ -50,58 +89,13 @@ services:
     networks:
       - pulse-net
 
-  # ── PostgreSQL (prod profile only) ──────────────────────────────────────────
-  postgres:
-    image: postgres:15-alpine
-    container_name: performance-pulse-postgres
-    profiles: ["prod"]           # only starts with: docker compose --profile prod up
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB:       performancepulse
-      POSTGRES_USER:     ${DB_USER:-pulse_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    ports:
-      - "5432:5432"              # expose for local DB clients (DBeaver, psql)
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro   # DDL init scripts (LLD §4)
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-pulse_user} -d performancepulse"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - pulse-net
-
-  # ── pgAdmin (prod profile only) ─────────────────────────────────────────────
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: performance-pulse-pgadmin
-    profiles: ["prod"]
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL:    admin@pulse.local
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-    ports:
-      - "5050:80"                # http://localhost:5050
-    volumes:
-      - pgadmin-data:/var/lib/pgadmin
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - pulse-net
-
 # ── Volumes ───────────────────────────────────────────────────────────────────
 volumes:
   postgres-data:
     driver: local
-  pgadmin-data:
-    driver: local
 
-# ── Networks ──────────────────────────────────────────────────────────────────
+# ── Networks ───────────────────────────────────────────────────────────────────
 networks:
   pulse-net:
     driver: bridge
+

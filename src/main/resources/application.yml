@@ -1,5 +1,5 @@
 # =============================================================================
-#  Talent Performance Pulse – Base Configuration
+#  Talent Performance Pulse – Base Configuration (PostgreSQL)
 #  LLD §12.1 – Key properties documented inline
 # =============================================================================
 
@@ -7,32 +7,66 @@ spring:
   application:
     name: performance-pulse
 
+  # ── DataSource / PostgreSQL ──────────────────────────────────────────────
+  datasource:
+    url: jdbc:postgresql://localhost:5432/performance_pulse
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 20000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
   # ── JPA / Hibernate ──────────────────────────────────────────────────────
   jpa:
+    # ddl-auto: create – automatically creates tables if they don't exist
+    # Change to 'validate' in production after initial setup
+    hibernate:
+      ddl-auto: create
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     # LLD §12.1 – prevents lazy loading being triggered in the controller layer
     open-in-view: false
     properties:
       hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         # LLD §14.2 – batch fetching reduces child-collection query count
         default_batch_fetch_size: 50
-        format_sql: false
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
     show-sql: false
 
   # ── Caching ──────────────────────────────────────────────────────────────
   cache:
     type: caffeine
-    # Per-cache TTLs are overridden programmatically in AppConfig (LLD §7)
+    # Per-cache TTLs are overridden programmatically in CacheConfig (LLD §7)
     caffeine:
       spec: maximumSize=1000,expireAfterWrite=10m
 
-  # ── H2 Console (dev only – disabled in prod profile) ─────────────────────
+  # ── Pagination guard ────────────────────────────────────────────────────
+  data:
+    web:
+      pageable:
+        # LLD §12.1 – protects against oversized page requests
+        default-page-size: 20
+        max-page-size: 100
+        one-indexed-parameters: false
+
+  # ── H2 Console (disabled) ────────────────────────────────────────────────
   h2:
     console:
-      enabled: false   # overridden to true in application-dev.yml
+      enabled: false
 
 # ── Server ───────────────────────────────────────────────────────────────────
 server:
   port: 8080
+  servlet:
+    context-path: /
   tomcat:
     # LLD §12.1 – aligned with HikariCP pool sizing
     threads:
@@ -49,6 +83,8 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+    caches:
+      enabled: true
 
 # ── OpenAPI / Swagger ────────────────────────────────────────────────────────
 springdoc:
@@ -68,15 +104,17 @@ spring.data.web.pageable:
 logging:
   level:
     root: INFO
-    com.hr.performancepulse: INFO
-    org.springframework.cache: DEBUG   # shows cache hit/miss in logs
+    com.hr.performancepulse: DEBUG
+    org.springframework.web: INFO
+    org.springframework.cache: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
-
 ---
 # =============================================================================
-#  DEV Profile – H2 in-memory database
-#  Activated by: SPRING_PROFILES_ACTIVE=dev  (default in docker-compose.yml)
+#  DEV Profile – PostgreSQL (local development)
+#  Activated by: SPRING_PROFILES_ACTIVE=dev
 # =============================================================================
 spring:
   config:
@@ -84,28 +122,33 @@ spring:
       on-profile: dev
 
   datasource:
-    url: jdbc:h2:mem:performancepulse;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: ""
-    hikari:
-      maximum-pool-size: 5    # small pool for local dev
+    url: jdbc:postgresql://localhost:5432/performance_pulse_dev
+    username: postgres
+    password: postgres
 
   jpa:
     hibernate:
-      ddl-auto: create-drop   # recreates schema on every restart
+      ddl-auto: create-drop   # recreates schema on every startup in dev
     show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
+
+  h2:
+    console:
+      enabled: false
+
+logging:
+  level:
+    root: INFO
+    com.hr.performancepulse: DEBUG
+    org.hibernate.SQL: DEBUG
+
 
   h2:
     console:
       enabled: true           # http://localhost:8080/h2-console
 
-logging:
-  level:
-    com.hr.performancepulse: DEBUG
+# logging:
+#   level:
+#     com.hr.performancepulse: DEBUG
 
 ---
 # =============================================================================
