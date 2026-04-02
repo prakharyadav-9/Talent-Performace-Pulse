@@ -1,0 +1,47 @@
+# =============================================================================
+#  .dockerignore – excludes files from the Docker build context
+#  Keeps the context small; prevents IDE / OS / target artifacts leaking in
+# =============================================================================
+
+# Maven build output (built inside the container, not copied from host)
+target/
+*.jar
+*.war
+
+# IDE directories
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+*.classpath
+*.project
+*.settings/
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker files themselves (no need inside the build context)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Docs / markdown (not needed at runtime)
+README.md
+docs/
+*.md
+
+# Test reports
+surefire-reports/
+failsafe-reports/
+
+# Env files with secrets – NEVER bake into image
+.env
+.env.*

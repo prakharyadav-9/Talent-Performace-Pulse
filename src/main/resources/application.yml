@@ -1,0 +1,142 @@
+# =============================================================================
+#  Talent Performance Pulse – Base Configuration
+#  LLD §12.1 – Key properties documented inline
+# =============================================================================
+
+spring:
+  application:
+    name: performance-pulse
+
+  # ── JPA / Hibernate ──────────────────────────────────────────────────────
+  jpa:
+    # LLD §12.1 – prevents lazy loading being triggered in the controller layer
+    open-in-view: false
+    properties:
+      hibernate:
+        # LLD §14.2 – batch fetching reduces child-collection query count
+        default_batch_fetch_size: 50
+        format_sql: false
+    show-sql: false
+
+  # ── Caching ──────────────────────────────────────────────────────────────
+  cache:
+    type: caffeine
+    # Per-cache TTLs are overridden programmatically in AppConfig (LLD §7)
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=10m
+
+  # ── H2 Console (dev only – disabled in prod profile) ─────────────────────
+  h2:
+    console:
+      enabled: false   # overridden to true in application-dev.yml
+
+# ── Server ───────────────────────────────────────────────────────────────────
+server:
+  port: 8080
+  tomcat:
+    # LLD §12.1 – aligned with HikariCP pool sizing
+    threads:
+      max: 200
+      min-spare: 10
+
+# ── Actuator ─────────────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        # health + info always; metrics useful for validating Caffeine cache stats
+        include: health, info, metrics, caches
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# ── OpenAPI / Swagger ────────────────────────────────────────────────────────
+springdoc:
+  swagger-ui:
+    path: /swagger-ui/index.html
+    try-it-out-enabled: true
+  api-docs:
+    path: /v3/api-docs
+
+# ── Pagination guard ─────────────────────────────────────────────────────────
+spring.data.web.pageable:
+  # LLD §12.1 – protects against oversized page requests
+  max-page-size: 100
+  default-page-size: 20
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+logging:
+  level:
+    root: INFO
+    com.hr.performancepulse: INFO
+    org.springframework.cache: DEBUG   # shows cache hit/miss in logs
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+---
+# =============================================================================
+#  DEV Profile – H2 in-memory database
+#  Activated by: SPRING_PROFILES_ACTIVE=dev  (default in docker-compose.yml)
+# =============================================================================
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:h2:mem:performancepulse;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+    hikari:
+      maximum-pool-size: 5    # small pool for local dev
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop   # recreates schema on every restart
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  h2:
+    console:
+      enabled: true           # http://localhost:8080/h2-console
+
+logging:
+  level:
+    com.hr.performancepulse: DEBUG
+
+---
+# =============================================================================
+#  PROD Profile – PostgreSQL
+#  All sensitive values injected via environment variables (Docker / K8s secrets)
+#  LLD §12.1 – HikariCP tuned for 500 concurrent managers
+# =============================================================================
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/performancepulse}
+    username: ${DB_USER:pulse_user}
+    password: ${DB_PASSWORD:changeme}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20          # LLD §14.1 – tuned for 500 concurrent users
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate             # schema must match entities; never auto-migrate in prod
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+logging:
+  level:
+    com.hr.performancepulse: INFO
