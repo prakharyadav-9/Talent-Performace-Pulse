@@ -3,14 +3,18 @@ package com.hr.performancepulse.controller;
 import com.hr.performancepulse.dto.request.CreateEmployeeRequest;
 import com.hr.performancepulse.dto.response.ApiResponse;
 import com.hr.performancepulse.dto.response.EmployeeResponse;
+import com.hr.performancepulse.dto.response.ReviewResponse;
 import com.hr.performancepulse.enums.Department;
 import com.hr.performancepulse.service.EmployeeService;
+import com.hr.performancepulse.service.PerformanceReviewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.*;
 public class EmployeeController extends BaseController {
     
     private final EmployeeService employeeService;
+    private final PerformanceReviewService performanceReviewService;
     
     /**
      * Create a new employee.
@@ -83,5 +88,27 @@ public class EmployeeController extends BaseController {
     public ResponseEntity<ApiResponse<EmployeeResponse>> getEmployee(@PathVariable String id) {
         EmployeeResponse response = employeeService.getEmployee(parseUuid(id));
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+    
+    /**
+     * Get all reviews for a specific employee across all cycles.
+     * 
+     * GET /api/v1/employees/{id}/reviews?page=0&size=20
+     * 
+     * Results ordered by submittedAt DESC (most recent first).
+     * Includes full cycle details for context.
+     * 
+     * @param id the employee ID
+     * @param pageable pagination details (page, size)
+     * @return 200 OK with paginated ReviewResponse list
+     * @throws ResourceNotFoundException 404 if employee not found
+     */
+    @GetMapping("/{id}/reviews")
+    @Operation(summary = "Get employee reviews", description = "Get all reviews submitted for an employee across all cycles with cycle details")
+    public ResponseEntity<ApiResponse<Page<ReviewResponse>>> getEmployeeReviews(
+            @PathVariable String id,
+            @PageableDefault(size = 20, page = 0, sort = "submittedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<ReviewResponse> reviews = performanceReviewService.getReviewsByEmployee(parseUuid(id), pageable);
+        return ResponseEntity.ok(ApiResponse.success(reviews));
     }
 }

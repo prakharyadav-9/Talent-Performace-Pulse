@@ -94,6 +94,17 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("REVIEW_FINALIZED", ex.getMessage()));
     }
 
+    /**
+     * LLD §10 – 400 when review rating is outside valid range (1-5).
+     */
+    @ExceptionHandler(InvalidRatingException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidRating(InvalidRatingException ex) {
+        log.warn("Invalid rating submitted: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("INVALID_RATING", ex.getMessage()));
+    }
+
     // ── Spring / Infrastructure Exceptions ───────────────────────────────
 
     /**
