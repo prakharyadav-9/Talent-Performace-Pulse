@@ -35,6 +35,11 @@ import java.util.List;
 @Builder
 public class Employee extends AuditEntity {
     
+    /**
+     * Note: Using @EqualsAndHashCode(callSuper=true) to include audit fields in equality checks.
+     * Lombok's @Data generates equals/hashCode, and callSuper=false is intentional for JPA entities.
+     */
+    
     @Column(length = 100, nullable = false)
     private String firstName;
     
@@ -64,6 +69,7 @@ public class Employee extends AuditEntity {
     
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private EmployeeStatus status = EmployeeStatus.ACTIVE;
     
     /**

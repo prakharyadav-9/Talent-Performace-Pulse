@@ -34,8 +34,5 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID>, JpaSp
     @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.reviews WHERE e.id = :id")
     Optional<Employee> findByIdWithReviews(@Param("id") UUID id);
     
-    /**
-     * Find all employees managed by a specific manager.
-     */
-    List<Employee> findByManagerId(UUID managerId);
+
 }

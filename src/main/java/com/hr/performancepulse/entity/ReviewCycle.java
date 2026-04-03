@@ -41,6 +41,7 @@ public class ReviewCycle extends AuditEntity {
     
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private CycleStatus status = CycleStatus.UPCOMING;
     
     /**

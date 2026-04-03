@@ -25,10 +25,6 @@ public interface GoalRepository extends JpaRepository<Goal, UUID> {
      */
     List<Goal> findByEmployeeIdAndCycleId(UUID employeeId, UUID cycleId);
     
-    /**
-     * Find all goals for a cycle with specific statuses.
-     */
-    List<Goal> findByCycleIdAndStatusIn(UUID cycleId, List<GoalStatus> statuses);
     
     /**
      * Get goal statistics for a cycle (total, completed, missed, in_progress counts).
