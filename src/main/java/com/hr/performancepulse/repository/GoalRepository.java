@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -31,17 +32,38 @@ public interface GoalRepository extends JpaRepository<Goal, UUID> {
     
     /**
      * Get goal statistics for a cycle (total, completed, missed, in_progress counts).
-     * Returns raw data as Object[] to avoid Tuple conversion issues.
-     * Index: [0]=total, [1]=completed, [2]=missed, [3]=in_progress
+     * Uses native query with cast to Map for flexibility.
      */
     @Query(nativeQuery = true, value = """
         SELECT 
-            COUNT(*) as total,
-            SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END) as completed,
-            SUM(CASE WHEN status = 'MISSED' THEN 1 ELSE 0 END) as missed,
-            SUM(CASE WHEN status = 'IN_PROGRESS' THEN 1 ELSE 0 END) as in_progress
+            COUNT(*)::BIGINT as total,
+            SUM(CASE WHEN status = 'COMPLETED' THEN 1 ELSE 0 END)::BIGINT as completed,
+            SUM(CASE WHEN status = 'MISSED' THEN 1 ELSE 0 END)::BIGINT as missed,
+            SUM(CASE WHEN status = 'IN_PROGRESS' THEN 1 ELSE 0 END)::BIGINT as in_progress
         FROM goals
         WHERE cycle_id = :cycleId
         """)
-    Object[] getGoalStatsByCycleId(@Param("cycleId") UUID cycleId);
+    Map<String, Long> getGoalStatsByCycleIdMap(@Param("cycleId") UUID cycleId);
+    
+    /**
+     * Get goal statistics for a cycle (total, completed, missed, in_progress counts).
+     * Wrapper method that converts map to DTO.
+     */
+    default GoalStatsDTO getGoalStatsByCycleId(UUID cycleId) {
+        Map<String, Long> result = getGoalStatsByCycleIdMap(cycleId);
+        if (result == null || result.isEmpty()) {
+            return GoalStatsDTO.builder()
+                    .total(0L)
+                    .completed(0L)
+                    .missed(0L)
+                    .inProgress(0L)
+                    .build();
+        }
+        return GoalStatsDTO.builder()
+                .total(result.getOrDefault("total", 0L))
+                .completed(result.getOrDefault("completed", 0L))
+                .missed(result.getOrDefault("missed", 0L))
+                .inProgress(result.getOrDefault("in_progress", 0L))
+                .build();
+    }
 }

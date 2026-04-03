@@ -88,7 +88,9 @@ class PerformancePulseE2ETest:
             self.test_employee_creation()
             self.test_cycle_creation()
             self.test_goal_creation()
+            self.test_goal_status_updates()
             self.test_review_submission()
+            self.test_review_finalization()
             self.test_employee_reviews()
             self.test_employee_filtering()
             self.test_cycle_summary()
@@ -284,9 +286,105 @@ class PerformancePulseE2ETest:
 
         log_info(f"Goals created: {goals_count}")
 
+    def test_goal_status_updates(self):
+        """Test PATCH /goals/{goalId} - Update goal status."""
+        log_section("5. UPDATE GOAL STATUS")
+
+        if not self.goals:
+            log_error("No goals to update")
+            return
+
+        updates_count = 0
+        
+        # Update first goal to IN_PROGRESS
+        if len(self.goals) >= 1:
+            goal = self.goals[0]
+            goal_id = goal["id"]
+            emp_name = goal["employee"]
+            
+            update_data = {
+                "title": goal["title"],
+                "description": "Goal in progress",
+                "dueDate": (datetime.now() + timedelta(days=20)).strftime("%Y-%m-%d"),
+                "status": "IN_PROGRESS"
+            }
+            
+            try:
+                response = self.session.patch(f"{BASE_URL}/goals/{goal_id}", json=update_data)
+                if response.status_code == 200:
+                    data = response.json()["data"]
+                    log_success(f"Updated goal for {emp_name} to IN_PROGRESS status")
+                    self.test_results["passed"] += 1
+                    updates_count += 1
+                else:
+                    log_error(f"Failed to update goal to IN_PROGRESS: {response.status_code}")
+                    self.test_results["failed"] += 1
+            except Exception as e:
+                log_error(f"Exception updating goal status: {str(e)}")
+                self.test_results["failed"] += 1
+            self.test_results["total"] += 1
+        
+        # Update second goal to COMPLETED
+        if len(self.goals) >= 2:
+            goal = self.goals[1]
+            goal_id = goal["id"]
+            emp_name = goal["employee"]
+            
+            update_data = {
+                "title": goal["title"],
+                "description": "Goal completed successfully",
+                "dueDate": (datetime.now() + timedelta(days=15)).strftime("%Y-%m-%d"),
+                "status": "COMPLETED"
+            }
+            
+            try:
+                response = self.session.patch(f"{BASE_URL}/goals/{goal_id}", json=update_data)
+                if response.status_code == 200:
+                    data = response.json()["data"]
+                    log_success(f"Updated goal for {emp_name} to COMPLETED status")
+                    self.test_results["passed"] += 1
+                    updates_count += 1
+                else:
+                    log_error(f"Failed to update goal to COMPLETED: {response.status_code}")
+                    self.test_results["failed"] += 1
+            except Exception as e:
+                log_error(f"Exception updating goal status: {str(e)}")
+                self.test_results["failed"] += 1
+            self.test_results["total"] += 1
+        
+        # Update third goal to MISSED
+        if len(self.goals) >= 3:
+            goal = self.goals[2]
+            goal_id = goal["id"]
+            emp_name = goal["employee"]
+            
+            update_data = {
+                "title": goal["title"],
+                "description": "Goal missed due to resource constraints",
+                "dueDate": (datetime.now() + timedelta(days=10)).strftime("%Y-%m-%d"),
+                "status": "MISSED"
+            }
+            
+            try:
+                response = self.session.patch(f"{BASE_URL}/goals/{goal_id}", json=update_data)
+                if response.status_code == 200:
+                    data = response.json()["data"]
+                    log_success(f"Updated goal for {emp_name} to MISSED status")
+                    self.test_results["passed"] += 1
+                    updates_count += 1
+                else:
+                    log_error(f"Failed to update goal to MISSED: {response.status_code}")
+                    self.test_results["failed"] += 1
+            except Exception as e:
+                log_error(f"Exception updating goal status: {str(e)}")
+                self.test_results["failed"] += 1
+            self.test_results["total"] += 1
+        
+        log_info(f"Goals updated: {updates_count}")
+
     def test_review_submission(self):
         """Test POST /reviews - Submit performance reviews."""
-        log_section("5. SUBMIT PERFORMANCE REVIEWS")
+        log_section("6. SUBMIT PERFORMANCE REVIEWS")
 
         if not self.employees or not self.cycles:
             log_error("Cannot submit reviews: missing employees or cycles")
@@ -409,9 +507,40 @@ class PerformancePulseE2ETest:
 
         log_info(f"Reviews submitted: {review_count}")
 
+    def test_review_finalization(self):
+        """Test PATCH /reviews/{id}/finalize - Finalize submitted reviews."""
+        log_section("7. FINALIZE PERFORMANCE REVIEWS")
+
+        if not self.reviews:
+            log_error("No reviews to finalize")
+            return
+
+        finalized_count = 0
+        for review in self.reviews:
+            review_id = review["id"]
+            emp_name = review["employee"]
+            reviewer_name = review["reviewer"]
+            
+            try:
+                response = self.session.patch(f"{BASE_URL}/reviews/{review_id}/finalize")
+                if response.status_code == 200:
+                    data = response.json()["data"]
+                    log_success(f"Finalized review: {reviewer_name} → {emp_name} (Rating: {data['rating']})")
+                    self.test_results["passed"] += 1
+                    finalized_count += 1
+                else:
+                    log_error(f"Failed to finalize review {review_id}: {response.status_code}")
+                    self.test_results["failed"] += 1
+            except Exception as e:
+                log_error(f"Exception finalizing review: {str(e)}")
+                self.test_results["failed"] += 1
+            self.test_results["total"] += 1
+
+        log_info(f"Reviews finalized: {finalized_count}")
+
     def test_employee_reviews(self):
         """Test GET /employees/{id}/reviews - Get all reviews for an employee."""
-        log_section("6. GET EMPLOYEE REVIEWS")
+        log_section("8. GET EMPLOYEE REVIEWS")
 
         emp_list = list(self.employees.items())
         if not emp_list:
@@ -442,7 +571,7 @@ class PerformancePulseE2ETest:
 
     def test_employee_filtering(self):
         """Test GET /employees?department={dept}&minRating={x} - Filter employees."""
-        log_section("7. FILTER EMPLOYEES BY DEPARTMENT & RATING")
+        log_section("9. FILTER EMPLOYEES BY DEPARTMENT & RATING")
 
         # Test 1: Filter by department
         try:
@@ -507,7 +636,7 @@ class PerformancePulseE2ETest:
 
     def test_cycle_summary(self):
         """Test GET /cycles/{id}/summary - Get cycle analytics summary."""
-        log_section("8. GET CYCLE SUMMARY & ANALYTICS")
+        log_section("10. GET CYCLE SUMMARY & ANALYTICS")
 
         if not self.cycles:
             log_error("No cycles to analyze")

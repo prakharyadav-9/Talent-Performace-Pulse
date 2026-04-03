@@ -157,4 +157,31 @@ public class PerformanceReviewServiceImpl implements PerformanceReviewService {
         Page<PerformanceReview> reviews = reviewRepository.findByEmployeeIdOrderBySubmittedAtDesc(employeeId, pageable);
         return reviews.map(reviewMapper::toResponse);
     }
+    
+    /**
+     * Finalize a review, making it count towards analytics.
+     * 
+     * Sets isFinalized=true so the review counts in average rating calculations.
+     * 
+     * @param reviewId review UUID to finalize
+     * @return ReviewResponse with finalized status
+     * @throws ResourceNotFoundException if review not found
+     */
+    @Override
+    public ReviewResponse finalizeReview(UUID reviewId) {
+        log.info("Finalizing review: {}", reviewId);
+        
+        PerformanceReview review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("PerformanceReview", reviewId));
+        
+        review.setIsFinalized(true);
+        PerformanceReview finalized = reviewRepository.save(review);
+        
+        log.info("Review finalized successfully: ID={}, employee={}, rating={}", 
+                 finalized.getId(), 
+                 finalized.getEmployee().getFirstName() + " " + finalized.getEmployee().getLastName(),
+                 finalized.getRating());
+        
+        return reviewMapper.toResponse(finalized);
+    }
 }

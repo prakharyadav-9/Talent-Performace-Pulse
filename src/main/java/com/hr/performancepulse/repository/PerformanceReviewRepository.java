@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -52,7 +53,7 @@ public interface PerformanceReviewRepository extends JpaRepository<PerformanceRe
     Double getAverageRatingByCycleId(@Param("cycleId") UUID cycleId);
     
     /**
-     * Get the top-performing employee in a cycle based on average rating.
+     * Get the top-performing employee in a cycle based on average rating (as a Map).
      * Returns null if no finalized reviews exist.
      * Used for cycle analytics (Phase 3).
      */
@@ -65,7 +66,23 @@ public interface PerformanceReviewRepository extends JpaRepository<PerformanceRe
         ORDER BY average_rating DESC
         LIMIT 1
         """)
-    TopPerformerDTO getTopPerformerByCycleId(@Param("cycleId") UUID cycleId);
+    Map<String, Object> getTopPerformerByCycleIdMap(@Param("cycleId") UUID cycleId);
+    
+    /**
+     * Get top performer as DTO wrapper around map query.
+     */
+    default TopPerformerDTO getTopPerformerByCycleId(UUID cycleId) {
+        Map<String, Object> result = getTopPerformerByCycleIdMap(cycleId);
+        if (result == null || result.isEmpty()) {
+            return null;
+        }
+        return TopPerformerDTO.builder()
+                .id((java.util.UUID) result.get("id"))
+                .firstName((String) result.get("first_name"))
+                .lastName((String) result.get("last_name"))
+                .averageRating(((Number) result.get("average_rating")).doubleValue())
+                .build();
+    }
     
     /**
      * Count reviews for a cycle.

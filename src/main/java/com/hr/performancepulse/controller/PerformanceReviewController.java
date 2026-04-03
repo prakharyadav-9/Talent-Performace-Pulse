@@ -47,4 +47,23 @@ public class PerformanceReviewController extends BaseController {
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response));
     }
+    
+    /**
+     * Finalize a performance review.
+     * 
+     * Once finalized, the review counts towards analytics (average rating, etc).
+     * Finalized reviews cannot be edited.
+     * 
+     * @param reviewId UUID of the review to finalize
+     * @return 200 OK with ReviewResponse
+     */
+    @PatchMapping("/{reviewId}/finalize")
+    @Operation(summary = "Finalize a review", description = "Finalize a review to make it count towards analytics")
+    public ResponseEntity<ApiResponse<ReviewResponse>> finalizeReview(
+            @PathVariable java.util.UUID reviewId) {
+        ReviewResponse response = reviewService.finalizeReview(reviewId);
+        return ResponseEntity
+                .ok()
+                .body(ApiResponse.success(response));
+    }
 }

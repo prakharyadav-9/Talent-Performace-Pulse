@@ -44,4 +44,16 @@ public interface PerformanceReviewService {
      * @throws com.hr.performancepulse.exception.ResourceNotFoundException if employee not found
      */
     Page<ReviewResponse> getReviewsByEmployee(UUID employeeId, Pageable pageable);
+    
+    /**
+     * Finalize a review, making it count towards analytics.
+     * 
+     * Once finalized, a review cannot be edited (throws ReviewFinalizedException on edit attempts).
+     * Evicts cycle-summary cache to recalculate analytics.
+     * 
+     * @param reviewId review UUID to finalize
+     * @return ReviewResponse with finalized status
+     * @throws com.hr.performancepulse.exception.ResourceNotFoundException if review not found
+     */
+    ReviewResponse finalizeReview(UUID reviewId);
 }

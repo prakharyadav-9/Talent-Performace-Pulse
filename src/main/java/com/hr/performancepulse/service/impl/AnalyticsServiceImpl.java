@@ -48,88 +48,81 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     public CycleSummaryResponse buildCycleSummary(UUID cycleId) {
         log.info("Building summary for cycle: {}", cycleId);
         
-        // 1. Fetch cycle
-        ReviewCycle cycle = cycleRepository.findById(cycleId)
-                .orElseThrow(() -> new ResourceNotFoundException("ReviewCycle", cycleId));
-        
-        // 2. Get total review count
-        Long totalReviews = reviewRepository.countByCycleId(cycleId);
-        
-        // 3. Calculate average rating (finalized reviews only)
-        Double avgRatingRaw = reviewRepository.getAverageRatingByCycleId(cycleId);
-        Double avgRating = avgRatingRaw != null ? Math.round(avgRatingRaw * 100.0) / 100.0 : 0.0;
-        
-        // 4. Get top performer
-        TopPerformerDTO topPerformerRaw = reviewRepository.getTopPerformerByCycleId(cycleId);
-        EmployeeSummaryDTO topPerformer = null;
-        if (topPerformerRaw != null) {
-            Double topRatingRounded = Math.round(topPerformerRaw.getAverageRating() * 100.0) / 100.0;
-            topPerformer = EmployeeSummaryDTO.builder()
-                    .id(topPerformerRaw.getId())
-                    .name(topPerformerRaw.getFullName())
-                    .averageRating(topRatingRounded)
-                    .build();
-        }
-        
-        // 5. Get goal statistics
-        GoalStatsDTO goalStats = convertGoalStats(goalRepository.getGoalStatsByCycleId(cycleId));
-        
-        // 6. Build response
-        CycleSummaryResponse response = CycleSummaryResponse.builder()
-                .cycleId(cycleId)
-                .cycleName(cycle.getName())
-                .startDate(cycle.getStartDate())
-                .endDate(cycle.getEndDate())
-                .totalReviews(totalReviews)
-                .averageRating(avgRating)
-                .topPerformer(topPerformer)
-                .goalStats(goalStats)
-                .generatedAt(LocalDateTime.now())
-                .build();
-        
-        log.info("Summary generated for cycle: {} (avg rating: {}, top performer: {})", 
-                 cycleId, avgRating, topPerformer != null ? topPerformer.getName() : "N/A");
-        
-        return response;
-    }
-    
-    /**
-     * Convert raw goal statistics from native query to GoalStatsDTO.
-     * Handles NULL values from COUNT and SUM operations.
-     * 
-     * @param rawData Object[] from native query [total, completed, missed, in_progress]
-     * @return GoalStatsDTO with converted values
-     */
-    private GoalStatsDTO convertGoalStats(Object[] rawData) {
-        if (rawData == null || rawData.length == 0) {
-            return GoalStatsDTO.builder()
-                    .total(0L)
-                    .completed(0L)
-                    .missed(0L)
-                    .inProgress(0L)
-                    .build();
-        }
-        
         try {
-            Long total = rawData[0] != null ? ((Number) rawData[0]).longValue() : 0L;
-            Long completed = rawData[1] != null ? ((Number) rawData[1]).longValue() : 0L;
-            Long missed = rawData[2] != null ? ((Number) rawData[2]).longValue() : 0L;
-            Long inProgress = rawData[3] != null ? ((Number) rawData[3]).longValue() : 0L;
+            // 1. Fetch cycle
+            ReviewCycle cycle = cycleRepository.findById(cycleId)
+                    .orElseThrow(() -> new ResourceNotFoundException("ReviewCycle", cycleId));
+            log.debug("Fetched cycle: {}", cycle.getName());
             
-            return GoalStatsDTO.builder()
-                    .total(total)
-                    .completed(completed)
-                    .missed(missed)
-                    .inProgress(inProgress)
+            // 2. Get total review count
+            Long totalReviews = reviewRepository.countByCycleId(cycleId);
+            log.debug("Total reviews: {}", totalReviews);
+            
+            // 3. Calculate average rating (finalized reviews only)
+            Double avgRatingRaw = reviewRepository.getAverageRatingByCycleId(cycleId);
+            Double avgRating = avgRatingRaw != null ? Math.round(avgRatingRaw * 100.0) / 100.0 : 0.0;
+            log.debug("Average rating: {}", avgRating);
+            
+            // 4. Get top performer
+            TopPerformerDTO topPerformerRaw = reviewRepository.getTopPerformerByCycleId(cycleId);
+            EmployeeSummaryDTO topPerformer = null;
+            if (topPerformerRaw != null) {
+                Double topRatingRounded = Math.round(topPerformerRaw.getAverageRating() * 100.0) / 100.0;
+                topPerformer = EmployeeSummaryDTO.builder()
+                        .id(topPerformerRaw.getId())
+                        .name(topPerformerRaw.getFullName())
+                        .averageRating(topRatingRounded)
+                        .build();
+                log.debug("Top performer: {}", topPerformer.getName());
+            } else {
+                log.debug("No top performer found");
+            }
+            
+            // 5. Get goal statistics
+            GoalStatsDTO goalStats = null;
+            try {
+                goalStats = goalRepository.getGoalStatsByCycleId(cycleId);
+            } catch (Exception e) {
+                log.warn("Error retrieving goal stats, using defaults: {}", e.getMessage());
+                goalStats = GoalStatsDTO.builder()
+                        .total(0L)
+                        .completed(0L)
+                        .missed(0L)
+                        .inProgress(0L)
+                        .build();
+            }
+            
+            if (goalStats == null) {
+                goalStats = GoalStatsDTO.builder()
+                        .total(0L)
+                        .completed(0L)
+                        .missed(0L)
+                        .inProgress(0L)
+                        .build();
+            }
+            log.debug("Goal stats: total={}, completed={}, missed={}, inProgress={}", 
+                     goalStats.getTotal(), goalStats.getCompleted(), goalStats.getMissed(), goalStats.getInProgress());
+            
+            // 6. Build response
+            CycleSummaryResponse response = CycleSummaryResponse.builder()
+                    .cycleId(cycleId)
+                    .cycleName(cycle.getName())
+                    .startDate(cycle.getStartDate())
+                    .endDate(cycle.getEndDate())
+                    .totalReviews(totalReviews)
+                    .averageRating(avgRating)
+                    .topPerformer(topPerformer)
+                    .goalStats(goalStats)
+                    .generatedAt(LocalDateTime.now())
                     .build();
+            
+            log.info("Summary generated for cycle: {} (avg rating: {}, top performer: {})", 
+                     cycleId, avgRating, topPerformer != null ? topPerformer.getName() : "N/A");
+            
+            return response;
         } catch (Exception e) {
-            log.error("Error converting goal statistics: {}", e.getMessage(), e);
-            return GoalStatsDTO.builder()
-                    .total(0L)
-                    .completed(0L)
-                    .missed(0L)
-                    .inProgress(0L)
-                    .build();
+            log.error("Error building cycle summary: {}", e.getMessage(), e);
+            throw e;
         }
     }
 }
