@@ -75,6 +75,22 @@ Talent Performance Pulse is a REST API backend that allows HR teams to:
 Zero local setup. Uses H2 in-memory DB by default.
 
 ```bash
+# 1. Start PostgreSQL (or use Docker just for the DB)
+docker compose up postgres -d
+
+# 2. Copy env and configure DB credentials
+cp .env.example .env
+
+# 3. Build and run
+mvn clean package -DskipTests
+java -jar target/performancepulse-0.0.1-SNAPSHOT.jar
+```
+---
+
+### Option B — Local Dev (Docker)
+
+
+```bash
 # 1. Copy env template (defaults work for dev)
 cp .env.example .env
 
@@ -88,21 +104,7 @@ docker compose up --build
 pip install -r requirements.txt && python test_e2e.py
 ```
 
----
 
-### Option B — Local Dev (Maven + PostgreSQL)
-
-```bash
-# 1. Start PostgreSQL (or use Docker just for the DB)
-docker compose up postgres -d
-
-# 2. Copy env and configure DB credentials
-cp .env.example .env
-
-# 3. Build and run
-mvn clean package -DskipTests
-java -jar target/performancepulse-0.0.1-SNAPSHOT.jar
-```
 
 ---
 
