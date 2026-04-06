@@ -67,6 +67,7 @@ Talent Performance Pulse is a REST API backend that allows HR teams to:
 | Java (local dev only) | 17 |
 | Maven (local dev only) | 3.9 |
 | Python (for E2E tests) | 3.8+ |
+| use `.env.example` for environment activation | -- |
 
 ---
 
