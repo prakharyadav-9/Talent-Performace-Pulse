@@ -1,6 +1,7 @@
 *#
 *.iml
 *.ipr
+.env
 *.iws
 *.jar
 *.sw?

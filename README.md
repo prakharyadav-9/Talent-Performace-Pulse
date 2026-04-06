@@ -67,63 +67,93 @@ Talent Performance Pulse is a REST API backend that allows HR teams to:
 | Java (local dev only) | 17 |
 | Maven (local dev only) | 3.9 |
 | Python (for E2E tests) | 3.8+ |
-| use `.env.example` for environment activation | -- |
+
+---
+
+### ⚠️ Environment File Policy
+
+
+| Environment | `.env` needed? | What to do |
+|---|---|---|
+| **Dev / Docker** | ❌ No | `docker compose up --build` works out of the box — no `.env` required |
+| **Local Maven** | ❌ No | Credentials are handled by the `dev` profile in `application.yml` |
+| **Production** | ✅ Yes | Copy `.env.example` → `.env`, fill in real credentials, **never commit it** |
+
+For production only:
+```bash
+# Copy the template and fill in real values before deploying
+cp .env.example .env
+
+# Required variables — app will refuse to start if any are missing:
+#   DB_URL       – jdbc:postgresql://<host>:5432/<dbname>
+#   DB_USER      – database username
+#   DB_PASSWORD  – database password
+#   DB_NAME      – database name
+```
+
+`.env.example` contains placeholder values and serves purely as a reference template.
 
 ---
 
 ### Option A — Docker (Recommended)
 
-Zero local setup. Uses H2 in-memory DB by default.
+Zero local setup. No `.env` needed. Runs with the `dev` Spring profile, PostgreSQL via Docker, and service with maven.
 
 ```bash
-# 1. Start PostgreSQL (or use Docker just for the DB)
-docker compose up postgres -d
-
-# 2. Copy env and configure DB credentials
-cp .env.example .env
-
-# 3. Build and run
-mvn clean package -DskipTests
-java -jar target/performancepulse-0.0.1-SNAPSHOT.jar
-```
----
-
-### Option B — Local Dev (Docker)
-
-
-```bash
-# 1. Copy env template (defaults work for dev)
-cp .env.example .env
-
-# 2. Build and start
+# 1. Build and start
 docker compose up --build
 
 # App is ready when you see:
 #   Started PerformancePulseApplication in X.XXX seconds
 
-# 3. Verify everything works — run the E2E test suite
-pip install -r requirements.txt && python test_e2e.py
+# 2. Build and run
+mvn clean package -DskipTests
+java -jar target/performancepulse-0.0.1-SNAPSHOT.jar
 ```
 
+---
 
+### Option B — Local Dev (Docker)
+
+```bash
+# 1. Start PostgreSQL via Docker
+docker compose up --build
+
+# App is ready when you see:
+#   Started PerformancePulseApplication in X.XXX seconds
+
+# 2. Verify everything works — run the E2E test suite
+pip install -r requirements.txt && python test_e2e.py
+```
 
 ---
 
 ### Option C — Production
 
 ```bash
+# 1. Create .env from the template and fill in real credentials
+cp .env.example .env
+
+# 2. Deploy — the prod Spring profile activates automatically
 docker compose -f docker-compose.prod.yml up --build -d
 ```
+
+> **Production security notes:**
+> - Swagger UI and `/api-docs` are **disabled** in the prod profile
+> - Actuator exposes only `/actuator/health` on port `8080`; all other endpoints (metrics, caches) are on internal port `9090` only
+> - SQL bind-parameter logging is off — no PII written to logs
+> - App startup **fails immediately** if `DB_URL`, `DB_USER`, or `DB_PASSWORD` are not set
 
 ---
 
 ### Verify the App is Running
 
-| URL | Description |
-|---|---|
-| `http://localhost:8080/swagger-ui.html` | Interactive API docs (Swagger UI) |
-| `http://localhost:8080/actuator/health` | Health check endpoint |
-| `http://localhost:8080/api/v1/employees` | Sample API call |
+| URL | Available in | Description |
+|---|---|---|
+| `http://localhost:8080/swagger-ui.html` | Dev only | Interactive API docs |
+| `http://localhost:8080/actuator/health` | Dev + Prod | Health check |
+| `http://localhost:9090/actuator/metrics` | Dev + Prod (internal port) | JVM and cache metrics |
+| `http://localhost:8080/api/v1/employees` | Dev + Prod | Sample API call |
 
 ---
 
@@ -157,7 +187,7 @@ Base path: `/api/v1`
 | `POST` | `/goals` | Create a goal for an employee in a cycle |
 | `PATCH` | `/goals/{id}` | Update a goal's status or progress |
 
-Full interactive documentation is available at **`/swagger-ui.html`** when the app is running.
+Full interactive documentation is available at **`/swagger-ui.html`** when running in **dev mode only**. Swagger is disabled in production.
 
 ---
 
@@ -295,7 +325,7 @@ Talent-Performance-Pulse/
 ├── QUICK_START.md                            # 5-minute test guide
 ├── TEST_E2E_README.md                        # Full E2E docs
 ├── SCALING_STRATEGY.md                       # Scaling decisions
-└── .env.example                              # Environment template
+└── .env.example                              # Credentials template — copy to .env for prod only
 ```
 
 ---
@@ -311,4 +341,4 @@ Talent-Performance-Pulse/
 | [`SCALING_STRATEGY.md`](SCALING_STRATEGY.md) | Horizontal scaling, caching, and DB optimisation decisions |
 | [`TEST_E2E_README.md`](TEST_E2E_README.md) | Comprehensive E2E test documentation |
 | [`QUICK_START.md`](QUICK_START.md) | 5-minute guide to running tests |
-| `http://localhost:8080/swagger-ui.html` | Live interactive API documentation (app must be running) |
+| `http://localhost:8080/swagger-ui.html` | Live interactive API docs — **dev mode only** |

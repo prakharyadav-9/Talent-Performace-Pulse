@@ -1,6 +1,5 @@
 # =============================================================================
-#  Talent Performance Pulse – Base Configuration (PostgreSQL)
-#  LLD §12.1 – Key properties documented inline
+#  Talent Performance Pulse – Base Configuration
 # =============================================================================
 
 spring:
@@ -9,9 +8,9 @@ spring:
 
   # ── DataSource / PostgreSQL ──────────────────────────────────────────────
   datasource:
-    url: jdbc:postgresql://localhost:5432/performance_pulse
-    username: postgres
-    password: postgres
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/performance_pulse}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -22,17 +21,13 @@ spring:
 
   # ── JPA / Hibernate ──────────────────────────────────────────────────────
   jpa:
-    # ddl-auto: create – automatically creates tables if they don't exist
-    # Change to 'validate' in production after initial setup
     hibernate:
       ddl-auto: create
     database-platform: org.hibernate.dialect.PostgreSQLDialect
-    # LLD §12.1 – prevents lazy loading being triggered in the controller layer
     open-in-view: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
-        # LLD §14.2 – batch fetching reduces child-collection query count
         default_batch_fetch_size: 50
         format_sql: true
         use_sql_comments: true
@@ -44,20 +39,18 @@ spring:
   # ── Caching ──────────────────────────────────────────────────────────────
   cache:
     type: caffeine
-    # Per-cache TTLs are overridden programmatically in CacheConfig (LLD §7)
     caffeine:
       spec: maximumSize=1000,expireAfterWrite=10m
 
-  # ── Pagination guard ────────────────────────────────────────────────────
+  # ── Pagination guard ─────────────────────────────────────────────────────
   data:
     web:
       pageable:
-        # LLD §12.1 – protects against oversized page requests
         default-page-size: 20
         max-page-size: 100
         one-indexed-parameters: false
 
-  # ── H2 Console (disabled) ────────────────────────────────────────────────
+  # ── H2 Console – disabled everywhere; dev profile re-enables explicitly ──
   h2:
     console:
       enabled: false
@@ -68,18 +61,18 @@ server:
   servlet:
     context-path: /
   tomcat:
-    # LLD §12.1 – aligned with HikariCP pool sizing
     threads:
       max: 200
       min-spare: 10
 
 # ── Actuator ─────────────────────────────────────────────────────────────────
 management:
+  server:
+    port: 9090
   endpoints:
     web:
       exposure:
-        # health + info always; metrics useful for validating Caffeine cache stats
-        include: health, info, metrics, caches
+        include: health, info
   endpoint:
     health:
       show-details: when-authorized
@@ -90,15 +83,9 @@ management:
 springdoc:
   swagger-ui:
     path: /swagger-ui/index.html
-    try-it-out-enabled: true
+    try-it-out-enabled: false
   api-docs:
     path: /v3/api-docs
-
-# ── Pagination guard ─────────────────────────────────────────────────────────
-spring.data.web.pageable:
-  # LLD §12.1 – protects against oversized page requests
-  max-page-size: 100
-  default-page-size: 20
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 logging:
@@ -107,14 +94,15 @@ logging:
     com.hr.performancepulse: DEBUG
     org.springframework.web: INFO
     org.springframework.cache: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.hibernate.SQL: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
 ---
 # =============================================================================
-#  DEV Profile – PostgreSQL (local development)
+#  DEV Profile
 #  Activated by: SPRING_PROFILES_ACTIVE=dev
+#  Intentionally permissive – never deploy with this profile.
 # =============================================================================
 spring:
   config:
@@ -124,37 +112,44 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/performance_pulse_dev
     username: postgres
-    password: postgres
+    password: postgres             # plain credentials are fine for local dev only
 
   jpa:
     hibernate:
-      ddl-auto: create-drop   # recreates schema on every startup in dev
+      ddl-auto: create-drop        # recreates schema on every restart in dev
     show-sql: true
 
   h2:
     console:
-      enabled: false
+      enabled: false                # http://localhost:8080/h2-console (dev only)
+
+# Swagger try-it-out re-enabled for dev convenience
+springdoc:
+  swagger-ui:
+    try-it-out-enabled: true
+
+# Management port opened fully for dev debugging
+management:
+  server:
+    port: 8080                     # same port as app in dev – easier to curl locally
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, caches, env, loggers
 
 logging:
   level:
     root: INFO
     com.hr.performancepulse: DEBUG
-    org.hibernate.SQL: DEBUG
-
-
-  h2:
-    console:
-      enabled: true           # http://localhost:8080/h2-console
-
-# logging:
-#   level:
-#     com.hr.performancepulse: DEBUG
+    org.hibernate.SQL: WARN
+    # Uncomment below only for query param debugging in dev – never in prod
+    # org.hibernate.type.descriptor.sql.BasicBinder: TRACE
 
 ---
 # =============================================================================
-#  PROD Profile – PostgreSQL
-#  All sensitive values injected via environment variables (Docker / K8s secrets)
-#  LLD §12.1 – HikariCP tuned for 500 concurrent managers
+#  PROD Profile
+#  Activated by: SPRING_PROFILES_ACTIVE=prod
+#  All sensitive values injected via environment variables (Docker / K8s secrets).
 # =============================================================================
 spring:
   config:
@@ -162,12 +157,12 @@ spring:
       on-profile: prod
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://postgres:5432/performancepulse}
-    username: ${DB_USER:pulse_user}
-    password: ${DB_PASSWORD:changeme}
+    url:      ${DB_URL:?DB_URL environment variable is required in prod}
+    username: ${DB_USER:?DB_USER environment variable is required in prod}
+    password: ${DB_PASSWORD:?DB_PASSWORD environment variable is required in prod}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 20          # LLD §14.1 – tuned for 500 concurrent users
+      maximum-pool-size: 20
       minimum-idle: 5
       connection-timeout: 30000
       idle-timeout: 600000
@@ -175,11 +170,33 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate             # schema must match entities; never auto-migrate in prod
+      ddl-auto: validate           # schema must match entities; never auto-migrate in prod
+    show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  h2:
+    console:
+      enabled: false
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health            # only health on public port 8080 in prod
+  endpoint:
+    health:
+      show-details: when-authorized
+
 logging:
   level:
-    com.hr.performancepulse: INFO
+    root: INFO
+    com.hr.performancepulse: INFO  # no DEBUG in prod – reduces log volume and noise
+    org.hibernate.SQL: WARN        # only log SQL warnings/errors in prod

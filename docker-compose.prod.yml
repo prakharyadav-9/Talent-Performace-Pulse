@@ -1,5 +1,64 @@
 services:
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: performance-pulse-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_DB:       ${DB_NAME:-performancepulse}
+      POSTGRES_USER:     ${DB_USER:-pulse_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-pulse_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pulse-net
+
   app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: performance-pulse-app-prod
+    restart: always
+    ports:
+      - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL:      jdbc:postgresql://postgres:5432/${DB_NAME:-performancepulse}
+      DB_USER:     ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      JAVA_OPTS: >-
+        -XX:+UseContainerSupport
+        -XX:MaxRAMPercentage=75.0
+        -Djava.security.egd=file:/dev/./urandom
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+        reservations:
+          memory: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    networks:
+      - pulse-net
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  pulse-net:
+    driver: bridge

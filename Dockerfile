@@ -48,7 +48,7 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport \
                -Djava.security.egd=file:/dev/./urandom"
 
 # Spring profile injected at runtime via docker-compose or -e flag
-ENV SPRING_PROFILES_ACTIVE=dev
+ENV SPRING_PROFILES_ACTIVE=prod
 
 EXPOSE 8080
 

@@ -116,7 +116,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                     .generatedAt(LocalDateTime.now())
                     .build();
             
-            log.info("Summary generated for cycle: {} (avg rating: {}, top performer: {})", 
+            log.debug("Summary generated for cycle: {} (avg rating: {}, top performer: {})", 
                      cycleId, avgRating, topPerformer != null ? topPerformer.getName() : "N/A");
             
             return response;
